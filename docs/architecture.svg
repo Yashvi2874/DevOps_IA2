@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e6522c"/>
+    </marker>
+    <style>
+      .box { fill:#fff; stroke:#94a3b8; stroke-width:1.5; }
+      .tool { fill:#fff7ed; stroke:#e6522c; stroke-width:2; }
+      .exp { fill:#f0f9ff; stroke:#38bdf8; stroke-width:1.5; }
+      .rcv { fill:#f0fdf4; stroke:#4ade80; stroke-width:1.5; }
+      .t { font-size:16px; font-weight:700; fill:#0f172a; }
+      .s { font-size:12.5px; fill:#475569; }
+      .l { font-size:12.5px; fill:#334155; }
+      .ln { stroke:#334155; stroke-width:1.7; fill:none; }
+      .pull { stroke:#e6522c; stroke-width:1.7; fill:none; stroke-dasharray:6 4; }
+      .hb { stroke:#16a34a; stroke-width:1.5; fill:none; stroke-dasharray:3 4; }
+    </style>
+  </defs>
+  <rect width="1200" height="760" fill="#f8fafc"/>
+  <rect x="15" y="15" width="1170" height="730" rx="14" fill="none" stroke="#60a5fa" stroke-dasharray="8 5"/>
+  <text x="32" y="42" font-size="15" font-weight="700" fill="#1e3a8a">Docker host · Compose project "ia2-monitoring" · network ia2-net · 10 containers</text>
+
+  <!-- application tier -->
+  <rect class="box" x="40" y="80" width="190" height="70" rx="10"/>
+  <text class="t" x="135" y="110" text-anchor="middle">Traffic generator</text>
+  <text class="s" x="135" y="130" text-anchor="middle">fake users, ~2–4 req/s</text>
+
+  <rect class="box" x="330" y="62" width="300" height="118" rx="10"/>
+  <text class="t" x="348" y="90">OrderFlow API  :8100</text>
+  <text class="s" x="348" y="111">Flask + gunicorn container</text>
+  <text class="s" x="348" y="130">/api/orders · /health · /ready · /metrics</text>
+  <text class="s" x="348" y="149">limits: 256 MB memory, 0.5 CPU</text>
+  <text class="s" x="348" y="168">fault injection (errors, latency, leak, CPU, crash)</text>
+
+  <rect class="box" x="760" y="80" width="190" height="70" rx="10"/>
+  <text class="t" x="855" y="110" text-anchor="middle">Redis</text>
+  <text class="s" x="855" y="130" text-anchor="middle">order database</text>
+
+  <path class="ln" d="M230 115 L326 115" marker-end="url(#a)"/>
+  <text class="l" x="278" y="105" text-anchor="middle">requests</text>
+  <path class="ln" d="M630 115 L756 115" marker-end="url(#a)"/>
+  <text class="l" x="693" y="105" text-anchor="middle">orders</text>
+
+  <!-- exporters -->
+  <rect class="exp" x="40" y="250" width="250" height="84" rx="10"/>
+  <text class="t" x="58" y="278">Blackbox exporter  :9115</text>
+  <text class="s" x="58" y="299">probes /health and /ready from outside,</text>
+  <text class="s" x="58" y="318">like a user (2 s timeout)</text>
+
+  <rect class="exp" x="360" y="250" width="250" height="84" rx="10"/>
+  <text class="t" x="378" y="278">cAdvisor  :8089</text>
+  <text class="s" x="378" y="299">CPU, memory, OOM kills and start</text>
+  <text class="s" x="378" y="318">time of every container</text>
+
+  <rect class="exp" x="760" y="250" width="190" height="84" rx="10"/>
+  <text class="t" x="778" y="278">Redis exporter</text>
+  <text class="s" x="778" y="299">redis_up, clients,</text>
+  <text class="s" x="778" y="318">memory used</text>
+
+  <path class="ln" d="M165 250 L360 184" marker-end="url(#a)"/>
+  <text class="l" x="120" y="212">HTTP probe</text>
+  <path class="ln" d="M485 250 L485 184" marker-end="url(#a)"/>
+  <text class="l" x="495" y="222">reads cgroups</text>
+  <path class="ln" d="M855 250 L855 154" marker-end="url(#a)"/>
+  <text class="l" x="865" y="205">INFO command</text>
+
+  <!-- Prometheus -->
+  <rect class="tool" x="300" y="420" width="330" height="150" rx="12"/>
+  <text class="t" x="320" y="450" fill="#9a3412">Prometheus  :9091</text>
+  <text class="s" x="320" y="473">pulls (scrapes) 7 targets every 5 s</text>
+  <text class="s" x="320" y="493">stores the samples in its time-series database</text>
+  <text class="s" x="320" y="513">6 recording rules (rate, error ratio, p95, ...)</text>
+  <text class="s" x="320" y="533">11 alert rules with `for` durations</text>
+  <text class="s" x="320" y="553">PromQL to ask questions about any of it</text>
+
+  <path class="pull" d="M360 420 L200 338" marker-end="url(#ap)"/>
+  <path class="pull" d="M465 420 L470 338" marker-end="url(#ap)"/>
+  <path class="pull" d="M600 420 L840 338" marker-end="url(#ap)"/>
+  <path class="pull" d="M520 420 C 660 380, 660 230, 600 184" marker-end="url(#ap)"/>
+
+  <!-- Alertmanager -->
+  <rect class="tool" x="720" y="420" width="440" height="150" rx="12"/>
+  <text class="t" x="740" y="450" fill="#9a3412">Alertmanager  :9094</text>
+  <text class="s" x="740" y="473">groups by alertname + service (one message per incident)</text>
+  <text class="s" x="740" y="493">routes: Watchdog → heartbeat · critical → email + chat</text>
+  <text class="s" x="740" y="513">             warning → chat</text>
+  <text class="s" x="740" y="533">inhibits symptoms when the cause is known (3 rules)</text>
+  <text class="s" x="740" y="553">silences, repeat interval, HTML email template</text>
+  <path class="ln" d="M630 495 L716 495" marker-end="url(#a)"/>
+  <text class="l" x="673" y="485" text-anchor="middle">alerts</text>
+
+  <!-- receivers -->
+  <rect class="rcv" x="640" y="640" width="240" height="78" rx="10"/>
+  <text class="t" x="658" y="668">Mailpit  :8025</text>
+  <text class="s" x="658" y="690">on-call email inbox (critical)</text>
+
+  <rect class="rcv" x="920" y="640" width="240" height="78" rx="10"/>
+  <text class="t" x="938" y="668">#ops-chat  :5002</text>
+  <text class="s" x="938" y="690">team channel + heartbeat status</text>
+
+  <path class="ln" d="M820 570 L760 636" marker-end="url(#a)"/>
+  <text class="l" x="700" y="608">email (SMTP)</text>
+  <path class="ln" d="M1000 570 L1030 636" marker-end="url(#a)"/>
+  <text class="l" x="1040" y="604">webhook</text>
+  <path class="hb" d="M1120 570 L1120 636" marker-end="url(#a)"/>
+  <text class="l" x="1128" y="625" fill="#15803d">heartbeat</text>
+
+  <!-- notes -->
+  <text class="s" x="40" y="620" font-weight="600" fill="#334155">Failures we inject and detect</text>
+  <text class="s" x="40" y="642">error spike · slow responses · hang · memory leak</text>
+  <text class="s" x="40" y="662">OOM kill · CPU at limit · container crash</text>
+  <text class="s" x="40" y="682">database down · whole service down</text>
+  <text class="s" x="40" y="712">Orange dashed lines: Prometheus pulls data (scrapes)</text>
+</svg>
