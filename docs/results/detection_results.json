@@ -1,0 +1,126 @@
+{
+  "scenarios": [
+    {
+      "scenario": "API error spike (50% of requests fail)",
+      "alert": "HighErrorRate",
+      "severity": "critical",
+      "chat_seconds": 64.3,
+      "email_seconds": 59.3,
+      "resolved_seconds": 56.7,
+      "prometheus_firing": [
+        "HighErrorRate"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "Slow responses (1.5 s per request)",
+      "alert": "HighLatencyP95",
+      "severity": "warning",
+      "chat_seconds": 89.6,
+      "email_seconds": null,
+      "resolved_seconds": 56.5,
+      "prometheus_firing": [
+        "HighLatencyP95"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "App hangs (3 s, health probe times out)",
+      "alert": "EndpointDown",
+      "severity": "critical",
+      "chat_seconds": 60.3,
+      "email_seconds": 55.3,
+      "resolved_seconds": 25.9,
+      "prometheus_firing": [
+        "EndpointDown",
+        "ServiceNotReady"
+      ],
+      "inhibited": [
+        "ServiceNotReady"
+      ]
+    },
+    {
+      "scenario": "Memory leak up to ~85% of the limit",
+      "alert": "ContainerMemoryNearLimit",
+      "severity": "warning",
+      "chat_seconds": 71.6,
+      "email_seconds": null,
+      "resolved_seconds": 25.9,
+      "prometheus_firing": [
+        "ContainerMemoryNearLimit"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "CPU burn (container at its CPU limit)",
+      "alert": "ContainerCPUThrottled",
+      "severity": "warning",
+      "chat_seconds": 76.1,
+      "email_seconds": null,
+      "resolved_seconds": 55.9,
+      "prometheus_firing": [
+        "ContainerCPUThrottled",
+        "ContainerRestarted"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "Database outage (docker stop ia2-redis)",
+      "alert": "DependencyDown",
+      "severity": "critical",
+      "chat_seconds": 31.7,
+      "email_seconds": 26.7,
+      "resolved_seconds": 26.1,
+      "prometheus_firing": [
+        "DependencyDown"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "Out of memory (fast leak, kernel OOM kill)",
+      "alert": "ContainerOOMKilled",
+      "severity": "critical",
+      "chat_seconds": 31.2,
+      "email_seconds": 26.2,
+      "resolved_seconds": 296.0,
+      "prometheus_firing": [
+        "ContainerOOMKilled"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "Container crash (process exits)",
+      "alert": "ContainerRestarted",
+      "severity": "warning",
+      "chat_seconds": 16.4,
+      "email_seconds": null,
+      "resolved_seconds": null,
+      "prometheus_firing": [
+        "ContainerRestarted"
+      ],
+      "inhibited": []
+    },
+    {
+      "scenario": "Whole service down (docker stop ia2-shop-api)",
+      "alert": "ServiceDown",
+      "severity": "critical",
+      "chat_seconds": 51.7,
+      "email_seconds": 46.7,
+      "resolved_seconds": 26.8,
+      "prometheus_firing": [
+        "ContainerRestarted",
+        "EndpointDown",
+        "ServiceDown",
+        "ServiceNotReady"
+      ],
+      "inhibited": [
+        "EndpointDown",
+        "ServiceNotReady"
+      ]
+    }
+  ],
+  "blip": {
+    "scenario": "10 s outage (false-positive check)",
+    "paged": []
+  }
+}
