@@ -1,0 +1,32 @@
+{{/* Notification templates. Alertmanager fills these in with the alerts
+     of one group; the email receiver in alertmanager.yml uses them. */}}
+
+{{ define "orderflow.email.subject" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }} x{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{{ if .CommonLabels.service }} on {{ .CommonLabels.service }}{{ end }}
+{{- end }}
+
+{{ define "orderflow.email.html" -}}
+<div style="font-family:Segoe UI,Arial,sans-serif;max-width:640px">
+  <h2 style="margin:0 0 4px;color:{{ if eq .Status "firing" }}#b91c1c{{ else }}#15803d{{ end }}">
+    {{ if eq .Status "firing" }}Something needs attention{{ else }}Resolved{{ end }}: {{ .CommonLabels.alertname }}
+  </h2>
+  <p style="margin:0 0 16px;color:#57534e">OrderFlow monitoring · {{ .Alerts.Firing | len }} firing, {{ .Alerts.Resolved | len }} resolved</p>
+  {{ range .Alerts }}
+  <table style="border-collapse:collapse;width:100%;margin-bottom:14px;border:1px solid #e7e5e4">
+    <tr><td style="padding:6px 10px;background:#f5f5f4;width:120px"><b>Status</b></td>
+        <td style="padding:6px 10px">{{ .Status | toUpper }}</td></tr>
+    <tr><td style="padding:6px 10px;background:#f5f5f4"><b>Summary</b></td>
+        <td style="padding:6px 10px">{{ .Annotations.summary }}</td></tr>
+    <tr><td style="padding:6px 10px;background:#f5f5f4"><b>Details</b></td>
+        <td style="padding:6px 10px">{{ .Annotations.description }}</td></tr>
+    <tr><td style="padding:6px 10px;background:#f5f5f4"><b>What to do</b></td>
+        <td style="padding:6px 10px">{{ .Annotations.runbook }}</td></tr>
+    <tr><td style="padding:6px 10px;background:#f5f5f4"><b>Started</b></td>
+        <td style="padding:6px 10px">{{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</td></tr>
+    <tr><td style="padding:6px 10px;background:#f5f5f4"><b>Labels</b></td>
+        <td style="padding:6px 10px;font-family:Consolas,monospace;font-size:12px">{{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}</td></tr>
+  </table>
+  {{ end }}
+  <p style="color:#a8a29e;font-size:12px">Sent by Alertmanager. Silence or browse alerts at http://localhost:9094</p>
+</div>
+{{- end }}
