@@ -1,0 +1,138 @@
+# Case study: automated failure detection and alert notification for
+# containerized applications, with Prometheus and Alertmanager.
+#
+#   docker compose up -d --build      start everything
+#   docker compose ps                 check it is running
+#   docker compose down               stop and remove (data volumes are kept)
+name: ia2-monitoring
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  # ---------------- the application being monitored ----------------
+  shop-api:
+    <<: *restart
+    build: ./app
+    image: orderflow-api:latest
+    container_name: ia2-shop-api
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CHAOS_ENABLED: "true"
+    ports: ["8100:8000"]
+    # Resource limits make the container-level alerts meaningful:
+    # memory near limit, OOM kill, CPU throttling.
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on: [redis]
+
+  redis:
+    <<: *restart
+    image: redis:8.10-alpine
+    container_name: ia2-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  traffic:
+    <<: *restart
+    build: ./traffic
+    image: orderflow-traffic:latest
+    container_name: ia2-traffic
+    environment:
+      TARGET: http://shop-api:8000
+      REQUESTS_PER_SECOND: "4"
+    depends_on: [shop-api]
+
+  # ---------------- exporters: things Prometheus can scrape ----------------
+  redis-exporter:
+    <<: *restart
+    image: oliver006/redis_exporter:v1.93.0
+    container_name: ia2-redis-exporter
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      # Answer quickly with redis_up=0 when Redis is gone. With the default
+      # 15 s the exporter outlives Prometheus's 4 s scrape timeout and the
+      # metric disappears instead of turning 0.
+      REDIS_EXPORTER_CONNECTION_TIMEOUT: 1s
+
+  blackbox:
+    <<: *restart
+    image: prom/blackbox-exporter:v0.28.0
+    container_name: ia2-blackbox
+    command: ["--config.file=/etc/blackbox/blackbox.yml"]
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    ports: ["9115:9115"]
+
+  cadvisor:
+    <<: *restart
+    image: ghcr.io/google/cadvisor:v0.60.6
+    container_name: ia2-cadvisor
+    privileged: true
+    devices: ["/dev/kmsg"]
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=5s
+      - --store_container_labels=false
+      - --disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl,advtcp,memory_numa
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports: ["8089:8080"]
+
+  # ---------------- the tools being studied ----------------
+  prometheus:
+    <<: *restart
+    image: prom/prometheus:v3.13.4
+    container_name: ia2-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=3d
+      - --web.enable-lifecycle          # allows POST /-/reload after editing rules
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - ./monitoring/prometheus/tests:/etc/prometheus/tests:ro
+      - prometheus-data:/prometheus
+    ports: ["9091:9090"]
+
+  alertmanager:
+    <<: *restart
+    image: prom/alertmanager:v0.34.1
+    container_name: ia2-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/templates:/etc/alertmanager/templates:ro
+      - alertmanager-data:/alertmanager
+    ports: ["9094:9093"]
+
+  # ---------------- where notifications end up ----------------
+  mailpit:
+    <<: *restart
+    image: axllent/mailpit:v1.31.3
+    container_name: ia2-mailpit
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports: ["8025:8025"]
+
+  ops-chat:
+    <<: *restart
+    build: ./monitoring/ops-chat
+    image: orderflow-ops-chat:latest
+    container_name: ia2-ops-chat
+    ports: ["5002:5002"]
+
+networks:
+  default:
+    name: ia2-net
+
+volumes:
+  prometheus-data:
+  alertmanager-data:
