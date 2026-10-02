@@ -1,0 +1,155 @@
+# Unit tests for the recording and alert rules:
+#   promtool test rules /etc/prometheus/tests/alert_rules_test.yml
+# Each test feeds made-up time series to Prometheus and checks exactly which
+# alerts are firing at a given moment.
+rule_files:
+  - ../rules/recording_rules.yml
+  - ../rules/alert_rules.yml
+
+evaluation_interval: 5s
+
+tests:
+  - name: service down for more than 30 s pages on-call
+    interval: 5s
+    input_series:
+      - series: 'up{job="shop-api", instance="shop-api:8000", app="orderflow", service="shop-api"}'
+        values: "1 1 0x12"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 45s
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: shop-api, instance: "shop-api:8000", app: orderflow, service: shop-api}
+            exp_annotations:
+              summary: OrderFlow API is down
+              description: Prometheus has not been able to scrape shop-api:8000 for over 30 seconds.
+              runbook: Check `docker ps -a` for the ia2-shop-api container and `docker logs ia2-shop-api`.
+
+  - name: a 10 second blip does not alert anyone
+    interval: 5s
+    input_series:
+      - series: 'up{job="shop-api", instance="shop-api:8000", app="orderflow", service="shop-api"}'
+        values: "1 1 0 0 1x10"
+    alert_rule_test:
+      - eval_time: 55s
+        alertname: ServiceDown
+        exp_alerts: []
+
+  - name: redis down is reported as the root cause
+    interval: 5s
+    input_series:
+      - series: 'redis_up{job="redis", instance="redis-exporter:9121", app="orderflow", service="redis"}'
+        values: "1 0x10"
+    alert_rule_test:
+      - eval_time: 25s
+        alertname: DependencyDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: redis, instance: "redis-exporter:9121", app: orderflow, service: redis}
+            exp_annotations:
+              summary: Redis (order database) is down
+              description: The Redis exporter cannot reach Redis. OrderFlow cannot store or read orders.
+              runbook: "Check the ia2-redis container: `docker ps -a`, `docker start ia2-redis`."
+
+  - name: redis still counts as down when its exporter can't be scraped
+    interval: 5s
+    input_series:
+      # the exporter times out: up is 0 and redis_up has no samples at all
+      - series: 'up{job="redis", instance="redis-exporter:9121", app="orderflow", service="redis"}'
+        values: "1 0x10"
+    alert_rule_test:
+      - eval_time: 25s
+        alertname: DependencyDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: redis, instance: "redis-exporter:9121", app: orderflow, service: redis}
+            exp_annotations:
+              summary: Redis (order database) is down
+              description: The Redis exporter cannot reach Redis. OrderFlow cannot store or read orders.
+              runbook: "Check the ia2-redis container: `docker ps -a`, `docker start ia2-redis`."
+
+  - name: error ratio from the recording rule triggers HighErrorRate
+    interval: 5s
+    input_series:
+      # 2 good and 1 failed request per second -> one third fail
+      - series: 'http_requests_total{job="shop-api", app="orderflow", service="shop-api", method="GET", route="/api/orders", status="200"}'
+        values: "0+10x40"
+      - series: 'http_requests_total{job="shop-api", app="orderflow", service="shop-api", method="GET", route="/api/orders", status="500"}'
+        values: "0+5x40"
+    promql_expr_test:
+      - expr: service:http_errors:ratio_rate1m
+        eval_time: 2m
+        exp_samples:
+          - labels: 'service:http_errors:ratio_rate1m{app="orderflow", service="shop-api"}'
+            value: 0.3333333333333333
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: {severity: critical, app: orderflow, service: shop-api}
+            exp_annotations:
+              summary: 33.33% of OrderFlow requests are failing
+              description: More than 10% of requests have returned a 5xx error for 30 seconds.
+              runbook: Look at `docker logs ia2-shop-api` and at whether a dependency is down.
+
+  - name: error ratio is 0 (not "no data") before the first error
+    interval: 5s
+    input_series:
+      - series: 'http_requests_total{job="shop-api", app="orderflow", service="shop-api", method="GET", route="/api/orders", status="200"}'
+        values: "0+10x40"
+    promql_expr_test:
+      - expr: service:http_errors:ratio_rate1m
+        eval_time: 2m
+        exp_samples:
+          - labels: 'service:http_errors:ratio_rate1m{app="orderflow", service="shop-api"}'
+            value: 0
+
+  - name: memory near the container limit, and containers without a limit are ignored
+    interval: 5s
+    input_series:
+      - series: 'container_memory_working_set_bytes{name="ia2-shop-api"}'
+        values: "100000000 200000000 230000000x10"
+      - series: 'container_spec_memory_limit_bytes{name="ia2-shop-api"}'
+        values: "268435456x12"
+      - series: 'container_memory_working_set_bytes{name="ia2-redis"}'
+        values: "50000000x12"
+      - series: 'container_spec_memory_limit_bytes{name="ia2-redis"}'
+        values: "0x12"
+    alert_rule_test:
+      - eval_time: 40s
+        alertname: ContainerMemoryNearLimit
+        exp_alerts:
+          - exp_labels: {severity: warning, name: ia2-shop-api}
+            exp_annotations:
+              summary: ia2-shop-api is using 85.68% of its memory limit
+              description: Above 80% of the limit; the kernel will kill the process if it reaches 100%.
+              runbook: Look for a memory leak, or raise mem_limit in docker-compose.yml.
+
+  - name: a container stuck at its CPU limit is reported as throttled
+    interval: 10s
+    input_series:
+      # 10 scheduling periods per second; 9 of them throttled once the burn starts
+      - series: 'container_cpu_cfs_periods_total{name="ia2-shop-api"}'
+        values: "0+100x20"
+      - series: 'container_cpu_cfs_throttled_periods_total{name="ia2-shop-api"}'
+        values: "0+5x3 15+90x16"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ContainerCPUThrottled
+        exp_alerts:
+          - exp_labels: {severity: warning, name: ia2-shop-api}
+            exp_annotations:
+              summary: ia2-shop-api is CPU-throttled in 90% of periods
+              description: The container keeps hitting its CPU limit, so the kernel makes it wait and requests slow down.
+              runbook: Find what is burning CPU (`docker stats`), or raise the `cpus` limit.
+
+  - name: the watchdog is always firing
+    interval: 5s
+    alert_rule_test:
+      - eval_time: 10s
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels: {severity: none}
+            exp_annotations:
+              summary: "Heartbeat: the alerting pipeline is working"
+              description: Always firing on purpose. If the heartbeat stops arriving, Prometheus or Alertmanager is broken.
