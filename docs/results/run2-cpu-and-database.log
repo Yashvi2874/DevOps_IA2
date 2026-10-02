@@ -1,0 +1,22 @@
+
+=== CPU burn (container at its CPU limit)  (expecting ContainerCPUThrottled)
+    chat after 76.1s, email after Nones; Prometheus firing ['ContainerCPUThrottled', 'ContainerRestarted']; inhibited []
+    resolved after 55.9s
+
+=== Database outage (docker stop ia2-redis)  (expecting DependencyDown)
+    chat after 31.7s, email after 26.7s; Prometheus firing ['DependencyDown']; inhibited []
+    resolved after 26.1s
+
+| Scenario | Expected alert | Severity | Ops chat | On-call email | Resolved after fix | Firing in Prometheus | Suppressed by inhibition |
+|---|---|---|---|---|---|---|---|
+| API error spike (50% of requests fail) | `HighErrorRate` | critical | 64 s | 59 s | 57 s | HighErrorRate | – |
+| Slow responses (1.5 s per request) | `HighLatencyP95` | warning | 90 s | – | 56 s | HighLatencyP95 | – |
+| App hangs (3 s, health probe times out) | `EndpointDown` | critical | 60 s | 55 s | 26 s | EndpointDown, ServiceNotReady | ServiceNotReady |
+| Memory leak up to ~85% of the limit | `ContainerMemoryNearLimit` | warning | 72 s | – | 26 s | ContainerMemoryNearLimit | – |
+| CPU burn (container at its CPU limit) | `ContainerCPUThrottled` | warning | 76 s | – | 56 s | ContainerCPUThrottled, ContainerRestarted | – |
+| Database outage (docker stop ia2-redis) | `DependencyDown` | critical | 32 s | 27 s | 26 s | DependencyDown | – |
+| Out of memory (fast leak, kernel OOM kill) | `ContainerOOMKilled` | critical | 31 s | 26 s | 296 s | ContainerOOMKilled | – |
+| Container crash (process exits) | `ContainerRestarted` | warning | 16 s | – | – | ContainerRestarted | – |
+| Whole service down (docker stop ia2-shop-api) | `ServiceDown` | critical | 52 s | 47 s | 27 s | ContainerRestarted, EndpointDown, ServiceDown, ServiceNotReady | EndpointDown, ServiceNotReady |
+
+False-positive check, 10 s outage: critical pages sent = 0
