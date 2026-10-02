@@ -1,0 +1,127 @@
+# Alerting rules. Each one is a PromQL condition; when it has been true for
+# the `for` duration, Prometheus sends the alert to Alertmanager.
+#
+# Severity decides where it goes (see alertmanager.yml):
+#   critical -> on-call email AND ops chat
+#   warning  -> ops chat
+#   none     -> heartbeat only (Watchdog)
+#
+# Causes fire faster than their symptoms (shorter `for`), so that
+# Alertmanager's inhibition rules can hide the symptoms.
+
+groups:
+  - name: availability
+    rules:
+      - alert: ServiceDown
+        expr: up{job="shop-api"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "OrderFlow API is down"
+          description: "Prometheus has not been able to scrape {{ $labels.instance }} for over 30 seconds."
+          runbook: "Check `docker ps -a` for the ia2-shop-api container and `docker logs ia2-shop-api`."
+
+      - alert: EndpointDown
+        expr: probe_success{job="blackbox-http", endpoint="health"} == 0
+        for: 40s
+        labels:
+          severity: critical
+        annotations:
+          summary: "OrderFlow health check fails from outside"
+          description: "The black-box probe of {{ $labels.instance }} has failed for 40 seconds (timeout or error)."
+          runbook: "The process may be up but hung. Compare with the latency graph; restart the container if stuck."
+
+      - alert: DependencyDown
+        # Also fire if the exporter itself can't be scraped: no evidence that
+        # Redis is fine should not count as "Redis is fine".
+        expr: redis_up{job="redis"} == 0 or up{job="redis"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis (order database) is down"
+          description: "The Redis exporter cannot reach Redis. OrderFlow cannot store or read orders."
+          runbook: "Check the ia2-redis container: `docker ps -a`, `docker start ia2-redis`."
+
+      - alert: ServiceNotReady
+        expr: probe_success{job="blackbox-http", endpoint="ready"} == 0
+        for: 45s
+        labels:
+          severity: warning
+        annotations:
+          summary: "OrderFlow is running but not ready"
+          description: "{{ $labels.instance }} has reported not ready for 45 seconds, so it can't serve orders."
+          runbook: "Readiness depends on Redis; check DependencyDown first."
+
+      - alert: ContainerRestarted
+        expr: max by (name) (changes(container_start_time_seconds{name=~"ia2-.+"}[5m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarted"
+          description: "{{ $labels.name }} started again in the last 5 minutes (crash, OOM kill or manual restart)."
+          runbook: "`docker inspect {{ $labels.name }}` shows the exit code and restart count."
+
+  - name: performance
+    rules:
+      - alert: HighErrorRate
+        expr: service:http_errors:ratio_rate1m{service="shop-api"} > 0.10
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $value | humanizePercentage }} of OrderFlow requests are failing"
+          description: "More than 10% of requests have returned a 5xx error for 30 seconds."
+          runbook: "Look at `docker logs ia2-shop-api` and at whether a dependency is down."
+
+      - alert: HighLatencyP95
+        expr: service:http_request_duration_seconds:p95_1m{service="shop-api"} > 0.5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OrderFlow is slow: p95 latency {{ $value | humanizeDuration }}"
+          description: "95% of requests took longer than 500 ms over the last minute."
+          runbook: "Check CPU usage of the container and recent changes."
+
+  - name: containers
+    rules:
+      - alert: ContainerMemoryNearLimit
+        expr: container:memory_working_set:ratio_limit > 0.80
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.name }} is using {{ $value | humanizePercentage }} of its memory limit"
+          description: "Above 80% of the limit; the kernel will kill the process if it reaches 100%."
+          runbook: "Look for a memory leak, or raise mem_limit in docker-compose.yml."
+
+      - alert: ContainerOOMKilled
+        expr: max by (name) (increase(container_oom_events_total{name=~"ia2-.+"}[5m])) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.name }} ran out of memory and a process was killed"
+          description: "The kernel's out-of-memory killer stopped a process in {{ $labels.name }}."
+          runbook: "Find the leak before raising the limit; `docker stats` shows memory live."
+
+      - alert: ContainerCPUThrottled
+        expr: container:cpu_throttled_periods:ratio_rate1m > 0.5
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.name }} is CPU-throttled in {{ $value | humanizePercentage }} of periods"
+          description: "The container keeps hitting its CPU limit, so the kernel makes it wait and requests slow down."
+          runbook: "Find what is burning CPU (`docker stats`), or raise the `cpus` limit."
+
+  - name: meta
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Heartbeat: the alerting pipeline is working"
+          description: "Always firing on purpose. If the heartbeat stops arriving, Prometheus or Alertmanager is broken."
