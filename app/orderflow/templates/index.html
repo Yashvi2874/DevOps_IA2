@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrderFlow</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-chaos="{{ 'on' if chaos_enabled else 'off' }}">
+  <header>
+    <div>
+      <h1>OrderFlow</h1>
+      <p>A small containerized order service, watched by Prometheus and Alertmanager</p>
+    </div>
+    <div class="status">
+      <span id="api-status" class="pill muted">API …</span>
+      <span id="db-status" class="pill muted">Redis …</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Place an order</h2>
+      <form id="order-form">
+        <input id="item" placeholder="Item, e.g. Notebook" maxlength="60" required>
+        <input id="qty" type="number" min="1" max="100" value="1" required>
+        <button type="submit" class="btn primary">Order</button>
+      </form>
+      <p id="order-msg" class="hint"></p>
+      <h2>Recent orders</h2>
+      <table>
+        <thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Placed</th></tr></thead>
+        <tbody id="orders"><tr><td colspan="4">Loading…</td></tr></tbody>
+      </table>
+    </section>
+
+    {% if chaos_enabled %}
+    <section class="card">
+      <h2>Fault injection</h2>
+      <p class="hint">Break the service on purpose and watch Prometheus detect it and Alertmanager notify
+        the on-call email and the ops chat. Alerts arrive 20–60 seconds later, by design.</p>
+      <div class="faults">
+        <button class="btn" data-action="latency" data-body='{"ms": 1500}'>Slow responses (1.5 s)</button>
+        <button class="btn" data-action="latency" data-body='{"ms": 3000}'>Hang (3 s, probe times out)</button>
+        <button class="btn" data-action="errors" data-body='{"rate": 0.5}'>50% of requests fail</button>
+        <button class="btn" data-action="leak" data-body='{"mb_per_sec": 5, "max_mb": 150}'>Memory leak (stops near limit)</button>
+        <button class="btn" data-action="oom" data-body='{"mb_per_sec": 40}'>Run out of memory (OOM kill)</button>
+        <button class="btn" data-action="cpu" data-body='{"seconds": 120}'>Burn CPU for 2 min</button>
+        <button class="btn danger" data-action="crash" data-body='{}'>Crash the container</button>
+        <button class="btn ok" data-action="reset" data-body='{}'>Reset all faults</button>
+      </div>
+      <p class="hint">Database outage: run <code>docker stop ia2-redis</code> (and <code>docker start ia2-redis</code> to recover).</p>
+      <pre id="chaos-state" class="state"></pre>
+    </section>
+    {% endif %}
+  </main>
+
+  <footer>
+    <a id="l-prom" href="#">Prometheus</a>
+    <a id="l-am" href="#">Alertmanager</a>
+    <a id="l-chat" href="#">Ops chat</a>
+    <a id="l-mail" href="#">On-call email (Mailpit)</a>
+    <a id="l-cad" href="#">cAdvisor</a>
+    <a href="/metrics">/metrics</a>
+  </footer>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
