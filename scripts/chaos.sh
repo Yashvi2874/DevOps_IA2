@@ -1,7 +1,5 @@
 #!/bin/sh
-# Inject (and clear) failures during a demo, from bash. Same faults as chaos.ps1:
-#   errors | slow | hang | leak | oom | cpu | crash | reset | status
-#   db-down | db-up | app-down | app-up
+# usage: chaos.sh errors|slow|hang|leak|oom|cpu|crash|reset|status|db-down|db-up|app-down|app-up
 set -eu
 URL="${URL:-http://localhost:8100}"
 post() { curl -s -X POST "$URL/api/chaos/$1" -H 'Content-Type: application/json' -d "$2"; echo; }

@@ -1,16 +1,9 @@
-"""Run every failure scenario against the live stack and time the alerts.
+"""Inject each failure into the running stack and time the alerts: until the
+ops chat (and, for critical alerts, the email inbox) gets them, and until
+they resolve after the fix. Writes docs/results/. Takes about 25 minutes.
 
-For each scenario this script:
-  1. injects the failure,
-  2. waits for the expected alert to reach the ops chat (and, for critical
-     alerts, the on-call email inbox), recording how long that took,
-  3. records which other alerts Alertmanager suppressed (inhibited),
-  4. removes the failure and times how long until the RESOLVED message.
-
-Run it from the repository root with the stack up:
     python scripts/measure_detection.py
-Results are written to docs/results/ as JSON and as a Markdown table.
-Standard library only. Takes about 25 minutes.
+    python scripts/measure_detection.py --only "cpu burn"    # re-run some
 """
 
 import json
@@ -51,7 +44,6 @@ def docker(*args):
 
 
 def chat_events(since):
-    """(alertname, status) pairs posted to the ops chat after `since`."""
     msgs = http("GET", f"{CHAT}/api/messages")
     if not isinstance(msgs, list):
         return []
@@ -104,13 +96,12 @@ def prometheus_firing():
 
 
 def settle(ignore=("Watchdog", "ContainerRestarted"), timeout=240):
-    """Wait until nothing but the ignorable alerts is active."""
     wait_for(lambda: not (set(active_alerts()) - set(ignore)), timeout, poll=3)
     time.sleep(35)  # let Alertmanager's group_interval pass so the next scenario starts clean
 
 
 SCENARIOS = [
-    # name, expected alert, severity, how to break, how to fix
+    # name, expected alert, severity, break, fix
     ("API error spike (50% of requests fail)", "HighErrorRate", "critical",
      lambda: chaos("errors", rate=0.5), lambda: chaos("reset")),
     ("Slow responses (1.5 s per request)", "HighLatencyP95", "warning",
@@ -161,7 +152,7 @@ def run_scenario(name, alert, severity, breaker, fixer):
 
 
 def blip_test():
-    """A 10-second outage must not page anyone (that's what `for: 30s` is for)."""
+    # a 10 s outage must not page anyone
     print("\n=== 10 s blip (docker stop, wait 10 s, docker start)", flush=True)
     t0 = time.time()
     docker("stop", "ia2-shop-api")
@@ -174,8 +165,6 @@ def blip_test():
 
 
 def main():
-    """`--only word ...` re-runs just the scenarios whose name contains a word
-    and merges them into the saved results."""
     OUT.mkdir(parents=True, exist_ok=True)
     only = [w.lower() for w in sys.argv[sys.argv.index("--only") + 1:]] if "--only" in sys.argv else []
     saved = OUT / "detection_results.json"

@@ -1,16 +1,5 @@
-"""ops-chat: a stand-in for a team chat channel such as Slack.
-
-Alertmanager delivers notifications here through webhooks:
-  POST /hooks/<channel>   alert notifications (firing and resolved)
-  POST /heartbeat         the always-firing Watchdog alert, about once a minute
-Pages:
-  GET  /                  the channel, newest message first, plus heartbeat status
-  GET  /api/messages      messages as JSON
-  GET  /api/heartbeat     heartbeat status as JSON
-  GET  /health            liveness
-
-Standard library only.
-"""
+"""Chat-channel stand-in. Alertmanager posts alerts to /hooks/<channel> and
+the Watchdog to /heartbeat; / shows the channel and heartbeat status."""
 
 import html
 import json
@@ -35,7 +24,6 @@ def iso(ts):
 
 
 def to_message(channel, payload, now=None):
-    """Turn an Alertmanager webhook body into one chat message."""
     alerts = [
         {
             "status": a.get("status", "unknown"),

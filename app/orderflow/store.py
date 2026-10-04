@@ -1,9 +1,5 @@
-"""Where orders are kept.
-
-The real app uses Redis. Tests use MemoryStore, which behaves the same way
-but needs no server. Both raise StoreUnavailable when the backing store
-can't be reached, so the app can turn that into a clear 503.
-"""
+"""Order storage: Redis in the app, MemoryStore in tests. Both raise
+StoreUnavailable when the store can't be reached."""
 
 import json
 import time

@@ -1,13 +1,4 @@
-# Alerting rules. Each one is a PromQL condition; when it has been true for
-# the `for` duration, Prometheus sends the alert to Alertmanager.
-#
-# Severity decides where it goes (see alertmanager.yml):
-#   critical -> on-call email AND ops chat
-#   warning  -> ops chat
-#   none     -> heartbeat only (Watchdog)
-#
-# Causes fire faster than their symptoms (shorter `for`), so that
-# Alertmanager's inhibition rules can hide the symptoms.
+# Causes use a shorter `for` than their symptoms so inhibition can hide the symptoms.
 
 groups:
   - name: availability
@@ -33,8 +24,7 @@ groups:
           runbook: "The process may be up but hung. Compare with the latency graph; restart the container if stuck."
 
       - alert: DependencyDown
-        # Also fire if the exporter itself can't be scraped: no evidence that
-        # Redis is fine should not count as "Redis is fine".
+        # an unreachable exporter is no evidence that Redis is fine
         expr: redis_up{job="redis"} == 0 or up{job="redis"} == 0
         for: 15s
         labels:

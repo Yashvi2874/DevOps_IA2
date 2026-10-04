@@ -1,6 +1,3 @@
-{{/* Notification templates. Alertmanager fills these in with the alerts
-     of one group; the email receiver in alertmanager.yml uses them. */}}
-
 {{ define "orderflow.email.subject" -}}
 [{{ .Status | toUpper }}{{ if eq .Status "firing" }} x{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}{{ if .CommonLabels.service }} on {{ .CommonLabels.service }}{{ end }}
 {{- end }}

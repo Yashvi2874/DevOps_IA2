@@ -1,9 +1,5 @@
-"""Steady fake user traffic for OrderFlow.
-
-Without traffic there is nothing to measure: error rate and latency are only
-meaningful when requests are flowing. This sends about 4 requests a second,
-a mix of browsing and ordering, and ignores failures (users would too).
-"""
+"""Fake users: a steady mix of browsing and ordering, so error rate and
+latency have something to measure."""
 
 import json
 import os

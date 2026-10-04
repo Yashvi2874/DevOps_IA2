@@ -1,9 +1,7 @@
-# How the blackbox exporter probes a target. Prometheus picks the module
-# with ?module=http_2xx (see prometheus.yml).
 modules:
   http_2xx:
     prober: http
-    timeout: 2s          # a page that takes longer than this counts as down
+    timeout: 2s
     http:
       method: GET
       valid_status_codes: [200]

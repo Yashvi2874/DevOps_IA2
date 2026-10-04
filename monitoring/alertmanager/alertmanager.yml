@@ -1,12 +1,6 @@
-# Alertmanager receives alerts from Prometheus and decides:
-#   who hears about them (routing), how they are bundled (grouping),
-#   what is hidden because a bigger problem explains it (inhibition),
-#   and how often reminders go out (timing).
-
 global:
   resolve_timeout: 5m
-  # Mailpit is a local mail server that catches every email and shows it in a
-  # web inbox, so the email path is real without needing a Gmail password.
+  # Mailpit catches the emails locally (inbox on :8025)
   smtp_smarthost: mailpit:1025
   smtp_from: alertmanager@orderflow.local
   smtp_require_tls: false
@@ -21,15 +15,13 @@ route:
   group_interval: 30s    # wait 30 s before sending an update for the same group
   repeat_interval: 3h    # remind every 3 h while something stays broken
   routes:
-    # The always-firing Watchdog goes only to the heartbeat endpoint, often.
     - matchers: ['alertname="Watchdog"']
       receiver: heartbeat
       group_wait: 0s
       group_interval: 30s
       repeat_interval: 1m
 
-    # Critical: email the on-call engineer fast, then keep going (continue)
-    # so the same alert also reaches the ops chat through the next route.
+    # continue: true lets critical alerts reach the chat route below as well
     - matchers: ['severity="critical"']
       receiver: oncall-email
       group_wait: 5s
@@ -59,20 +51,17 @@ receivers:
         send_resolved: false
 
 inhibit_rules:
-  # Redis is down: the errors, slowness and "not ready" in OrderFlow are
-  # symptoms of that, so only the root cause is reported.
+  # Redis down explains the app's errors, slowness and not-ready
   - source_matchers: ['alertname="DependencyDown"']
     target_matchers: ['alertname=~"HighErrorRate|HighLatencyP95|ServiceNotReady"']
     equal: ["app"]
 
-  # The whole service is down: no point also reporting it as slow, failing,
-  # unreachable from outside or not ready.
+  # service down: hide everything it causes
   - source_matchers: ['alertname="ServiceDown"']
     target_matchers: ['alertname=~"EndpointDown|HighErrorRate|HighLatencyP95|ServiceNotReady"']
     equal: ["app"]
 
-  # The health check times out (the app hangs): slowness and "not ready" are
-  # the same problem seen from another angle.
+  # a hung app also looks slow and not ready
   - source_matchers: ['alertname="EndpointDown"']
     target_matchers: ['alertname=~"HighLatencyP95|ServiceNotReady"']
     equal: ["app"]

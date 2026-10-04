@@ -1,7 +1,4 @@
-# Unit tests for the recording and alert rules:
-#   promtool test rules /etc/prometheus/tests/alert_rules_test.yml
-# Each test feeds made-up time series to Prometheus and checks exactly which
-# alerts are firing at a given moment.
+# promtool test rules /etc/prometheus/tests/alert_rules_test.yml
 rule_files:
   - ../rules/recording_rules.yml
   - ../rules/alert_rules.yml

@@ -1,20 +1,8 @@
-<#
-  Inject (and clear) failures during a demo, from PowerShell.
-
-    .\scripts\chaos.ps1 errors        # 50% of requests fail       -> HighErrorRate (critical)
-    .\scripts\chaos.ps1 slow          # 1.5 s per request          -> HighLatencyP95 (warning)
-    .\scripts\chaos.ps1 hang          # 3 s, health probe times out -> EndpointDown (critical)
-    .\scripts\chaos.ps1 leak          # memory to ~85% of limit    -> ContainerMemoryNearLimit
-    .\scripts\chaos.ps1 oom           # fast leak, kernel kills it -> ContainerOOMKilled
-    .\scripts\chaos.ps1 cpu           # burn CPU for 2 minutes     -> ContainerCPUThrottled
-    .\scripts\chaos.ps1 crash         # container exits            -> ContainerRestarted
-    .\scripts\chaos.ps1 db-down       # docker stop ia2-redis      -> DependencyDown (critical)
-    .\scripts\chaos.ps1 db-up
-    .\scripts\chaos.ps1 app-down      # docker stop ia2-shop-api   -> ServiceDown (critical)
-    .\scripts\chaos.ps1 app-up
-    .\scripts\chaos.ps1 reset         # clear every injected fault
-    .\scripts\chaos.ps1 status
-#>
+# .\scripts\chaos.ps1 errors
+#   errors -> HighErrorRate      slow -> HighLatencyP95       hang -> EndpointDown
+#   leak   -> MemoryNearLimit    oom  -> ContainerOOMKilled   cpu  -> ContainerCPUThrottled
+#   crash  -> ContainerRestarted db-down/db-up -> DependencyDown
+#   app-down/app-up -> ServiceDown                            reset, status
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet("errors", "slow", "hang", "leak", "oom", "cpu", "crash", "db-down", "db-up", "app-down", "app-up", "reset", "status")]

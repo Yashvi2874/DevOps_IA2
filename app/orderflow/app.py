@@ -1,5 +1,3 @@
-"""OrderFlow: a small order-taking web service that Prometheus monitors."""
-
 import os
 import signal
 import threading
@@ -21,19 +19,12 @@ from prometheus_client import (
 from .chaos import Chaos
 from .store import RedisStore, StoreUnavailable
 
-# Paths that chaos never touches. /metrics stays fast on purpose: that is how
-# the demo shows the difference between "the process is up" (Prometheus can
-# scrape it) and "users can use it" (the black-box probe of /health).
+# never slowed down, so a hang shows up in the black-box probe while up stays 1
 UNTOUCHED = ("/metrics", "/api/chaos", "/static/")
 
 
 def kill_container():
-    """Make the container exit so Docker's restart policy has to step in.
-
-    gunicorn is PID 1 in the container and this worker is its child.
-    Interrupting PID 1 stops the container; outside a container we only
-    exit this process.
-    """
+    # gunicorn is PID 1; stopping it takes the whole container down
     if os.getppid() == 1:
         os.kill(1, signal.SIGINT)
     os._exit(1)
@@ -95,8 +86,6 @@ def create_app(config=None):
 
     app.extensions["orderflow"] = SimpleNamespace(store=store, chaos=chaos, metrics=metrics)
 
-    # ---- request instrumentation and fault injection ----------------------
-
     @app.before_request
     def before():
         g.start = time.perf_counter()
@@ -114,20 +103,16 @@ def create_app(config=None):
             metrics.duration.labels(route).observe(time.perf_counter() - g.get("start", time.perf_counter()))
         return response
 
-    # ---- pages and health ------------------------------------------------
-
     @app.get("/")
     def index():
         return render_template("index.html", chaos_enabled=app.config["CHAOS_ENABLED"])
 
     @app.get("/health")
     def health():
-        """Liveness: the web process is serving requests."""
         return jsonify(status="ok", uptime_seconds=round(time.time() - state.started_at, 1))
 
     @app.get("/ready")
     def ready():
-        """Readiness: the service can do its job, which needs Redis."""
         redis_ok = store.ping()
         metrics.dependency_up.labels("redis").set(1 if redis_ok else 0)
         body = {"status": "ready" if redis_ok else "not ready", "redis": "up" if redis_ok else "down"}
@@ -137,8 +122,6 @@ def create_app(config=None):
     def prometheus_metrics():
         refresh_gauges()
         return Response(generate_latest(metrics.registry), mimetype=CONTENT_TYPE_LATEST)
-
-    # ---- orders API --------------------------------------------------------
 
     @app.get("/api/orders")
     def list_orders():
@@ -163,8 +146,6 @@ def create_app(config=None):
             return jsonify(error="order database unavailable"), 503
         metrics.orders.inc()
         return jsonify(order=order), 201
-
-    # ---- fault injection ---------------------------------------------------
 
     @app.get("/api/chaos")
     def chaos_state():

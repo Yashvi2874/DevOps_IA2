@@ -1,16 +1,10 @@
-# Recording rules pre-compute expensive or often-used queries and store the
-# result as a new series. The alert rules and graphs then use these short
-# names instead of repeating the full PromQL.
 groups:
   - name: orderflow-recording
     rules:
-      # Requests per second (the "R" in RED: Rate, Errors, Duration)
       - record: service:http_requests:rate1m
         expr: sum by (app, service) (rate(http_requests_total{job="shop-api"}[1m]))
 
-      # Share of requests that failed with a 5xx status. Until the first error
-      # happens there is no 5xx series at all, so "or ... * 0" supplies a zero
-      # with the right labels; otherwise the ratio would show "no data".
+      # "or ... * 0" gives 0 instead of no data before the first 5xx
       - record: service:http_errors:ratio_rate1m
         expr: |
           (
@@ -21,22 +15,19 @@ groups:
             /
           sum by (app, service) (rate(http_requests_total{job="shop-api"}[1m]))
 
-      # 95th percentile response time: 95% of requests were faster than this
       - record: service:http_request_duration_seconds:p95_1m
         expr: |
           histogram_quantile(0.95,
             sum by (le, app, service) (rate(http_request_duration_seconds_bucket{job="shop-api"}[1m])))
 
-      # Memory used by each container as a share of its memory limit
-      # (containers without a limit report 0 and are left out)
+      # containers without a limit report 0 and are skipped
       - record: container:memory_working_set:ratio_limit
         expr: |
           max by (name) (container_memory_working_set_bytes{name=~"ia2-.+"})
             /
           max by (name) (container_spec_memory_limit_bytes{name=~"ia2-.+"} > 0)
 
-      # CPU used by each container as a share of its CPU limit (for graphs;
-      # it is too jumpy to alert on, see the throttling rule below)
+      # graphs only: too jumpy to alert on
       - record: container:cpu_usage:ratio_limit
         expr: |
           sum by (name) (rate(container_cpu_usage_seconds_total{name=~"ia2-.+"}[1m]))
@@ -44,9 +35,7 @@ groups:
           (max by (name) (container_spec_cpu_quota{name=~"ia2-.+"} > 0)
              / max by (name) (container_spec_cpu_period{name=~"ia2-.+"}))
 
-      # Share of CPU scheduling periods in which the container was throttled
-      # (made to wait because it hit its CPU limit). Both counters come from
-      # the same cAdvisor sample, so this ratio is smooth enough to alert on.
+      # both counters come from the same cAdvisor sample, so this one is smooth
       - record: container:cpu_throttled_periods:ratio_rate1m
         expr: |
           sum by (name) (rate(container_cpu_cfs_throttled_periods_total{name=~"ia2-.+"}[1m]))
