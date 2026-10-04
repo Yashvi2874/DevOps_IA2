@@ -6,7 +6,7 @@
 |---|---|
 | Yashasvi Gupta | 16010123341 |
 | Shweta Karandikar | 16010123329 |
-| Aditi Agarwal | 16010123018 |
+| Aditi Agrawal | 16010123018 |
 
 Division faculty: SCP
 
