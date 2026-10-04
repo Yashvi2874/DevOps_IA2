@@ -142,7 +142,7 @@ monitoring/alertmanager/ alertmanager.yml, templates/
 monitoring/blackbox/     probe settings
 monitoring/ops-chat/     webhook receiver (chat + heartbeat)
 scripts/                 chaos.ps1 / chaos.sh, measure_detection.py
-docs/                    case study report, screenshots, results
+docs/                    case study report (md, docx, pdf), presentation (pptx), screenshots, results
 ```
 
 ## Useful PromQL to try in Prometheus
