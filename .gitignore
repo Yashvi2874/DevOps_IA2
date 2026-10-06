@@ -7,11 +7,16 @@ htmlcov/
 .venv/
 venv/
 
-# Local notes
+# Environment & credentials
 .env
 
-# Editors / OS
+# Editors & OS
 .vscode/
 .idea/
 Thumbs.db
 .DS_Store
+~$*
+*.tmp
+
+# Large video binaries (hosted on Google Drive)
+*.mp4

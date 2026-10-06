@@ -10,7 +10,7 @@
   <header>
     <div>
       <h1>OrderFlow</h1>
-      <p>A small containerized order service, watched by Prometheus and Alertmanager</p>
+      <p>Food orders placed by customers, watched by Prometheus and Alertmanager</p>
     </div>
     <div class="status">
       <span id="api-status" class="pill muted">API …</span>
@@ -22,7 +22,7 @@
     <section class="card">
       <h2>Place an order</h2>
       <form id="order-form">
-        <input id="item" placeholder="Item, e.g. Notebook" maxlength="60" required>
+        <input id="item" placeholder="Item, e.g. Margherita Pizza" maxlength="60" required>
         <input id="qty" type="number" min="1" max="100" value="1" required>
         <button type="submit" class="btn primary">Order</button>
       </form>
@@ -38,7 +38,7 @@
     <section class="card">
       <h2>Fault injection</h2>
       <p class="hint">Break the service on purpose and watch Prometheus detect it and Alertmanager notify
-        the on-call email and the ops chat. Alerts arrive 20–60 seconds later, by design.</p>
+        the on-call email and the ops chat. Alerts arrive about a minute later, by design.</p>
       <div class="faults">
         <button class="btn" data-action="latency" data-body='{"ms": 1500}'>Slow responses (1.5 s)</button>
         <button class="btn" data-action="latency" data-body='{"ms": 3000}'>Hang (3 s, probe times out)</button>

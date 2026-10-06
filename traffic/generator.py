@@ -1,5 +1,5 @@
-"""Fake users: a steady mix of browsing and ordering, so error rate and
-latency have something to measure."""
+"""Simulated customer traffic: a steady mix of browsing and meal orders,
+so error rate and latency have realistic traffic to measure."""
 
 import json
 import os
@@ -10,7 +10,10 @@ import urllib.request
 
 TARGET = os.environ.get("TARGET", "http://shop-api:8000")
 RATE = float(os.environ.get("REQUESTS_PER_SECOND", "4"))
-ITEMS = ["Notebook", "Pen", "Backpack", "Water bottle", "Desk lamp", "Headphones", "Stapler"]
+ITEMS = [
+    "Margherita Pizza", "Veggie Burger", "Pasta Alfredo",
+    "French Fries", "Cold Brew Coffee", "Garlic Bread", "Chocolate Brownie"
+]
 
 
 def request(method, path, body=None):

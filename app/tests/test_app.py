@@ -60,10 +60,10 @@ def test_ready_depends_on_redis(client, store):
 
 
 def test_create_and_list_orders(client):
-    res = post(client, "/api/orders", item="Notebook", quantity=2)
+    res = post(client, "/api/orders", item="Margherita Pizza", quantity=2)
     assert res.status_code == 201
     orders = client.get("/api/orders").get_json()["orders"]
-    assert orders[0]["item"] == "Notebook"
+    assert orders[0]["item"] == "Margherita Pizza"
     assert orders[0]["quantity"] == 2
 
 

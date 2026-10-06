@@ -21,17 +21,17 @@
   </defs>
   <rect width="1200" height="760" fill="#f8fafc"/>
   <rect x="15" y="15" width="1170" height="730" rx="14" fill="none" stroke="#60a5fa" stroke-dasharray="8 5"/>
-  <text x="32" y="42" font-size="15" font-weight="700" fill="#1e3a8a">Docker host · Compose project "ia2-monitoring" · network ia2-net · 10 containers</text>
+  <text x="32" y="42" font-size="15" font-weight="700" fill="#1e3a8a">Docker host, Compose project "ia2-monitoring", network ia2-net, 10 containers</text>
 
   <!-- application tier -->
   <rect class="box" x="40" y="80" width="190" height="70" rx="10"/>
   <text class="t" x="135" y="110" text-anchor="middle">Traffic generator</text>
-  <text class="s" x="135" y="130" text-anchor="middle">fake users, ~2–4 req/s</text>
+  <text class="s" x="135" y="130" text-anchor="middle">fake users, 2 to 4 req/s</text>
 
   <rect class="box" x="330" y="62" width="300" height="118" rx="10"/>
   <text class="t" x="348" y="90">OrderFlow API  :8100</text>
   <text class="s" x="348" y="111">Flask + gunicorn container</text>
-  <text class="s" x="348" y="130">/api/orders · /health · /ready · /metrics</text>
+  <text class="s" x="348" y="130">/api/orders, /health, /ready, /metrics</text>
   <text class="s" x="348" y="149">limits: 256 MB memory, 0.5 CPU</text>
   <text class="s" x="348" y="168">fault injection (errors, latency, leak, CPU, crash)</text>
 
@@ -73,7 +73,7 @@
   <text class="s" x="320" y="473">pulls (scrapes) 7 targets every 5 s</text>
   <text class="s" x="320" y="493">stores the samples in its time-series database</text>
   <text class="s" x="320" y="513">6 recording rules (rate, error ratio, p95, ...)</text>
-  <text class="s" x="320" y="533">11 alert rules with `for` durations</text>
+  <text class="s" x="320" y="533">11 alert rules with "for" durations</text>
   <text class="s" x="320" y="553">PromQL to ask questions about any of it</text>
 
   <path class="pull" d="M360 420 L200 338" marker-end="url(#ap)"/>
@@ -85,8 +85,8 @@
   <rect class="tool" x="720" y="420" width="440" height="150" rx="12"/>
   <text class="t" x="740" y="450" fill="#9a3412">Alertmanager  :9094</text>
   <text class="s" x="740" y="473">groups by alertname + service (one message per incident)</text>
-  <text class="s" x="740" y="493">routes: Watchdog → heartbeat · critical → email + chat</text>
-  <text class="s" x="740" y="513">             warning → chat</text>
+  <text class="s" x="740" y="493">routes: Watchdog to heartbeat, critical to email + chat</text>
+  <text class="s" x="740" y="513">             warning to chat</text>
   <text class="s" x="740" y="533">inhibits symptoms when the cause is known (3 rules)</text>
   <text class="s" x="740" y="553">silences, repeat interval, HTML email template</text>
   <path class="ln" d="M630 495 L716 495" marker-end="url(#a)"/>
@@ -110,8 +110,8 @@
 
   <!-- notes -->
   <text class="s" x="40" y="620" font-weight="600" fill="#334155">Failures we inject and detect</text>
-  <text class="s" x="40" y="642">error spike · slow responses · hang · memory leak</text>
-  <text class="s" x="40" y="662">OOM kill · CPU at limit · container crash</text>
-  <text class="s" x="40" y="682">database down · whole service down</text>
-  <text class="s" x="40" y="712">Orange dashed lines: Prometheus pulls data (scrapes)</text>
+  <text class="s" x="40" y="642">error spike, slow responses, hang, memory leak</text>
+  <text class="s" x="40" y="662">OOM kill, CPU at limit, container crash</text>
+  <text class="s" x="40" y="682">database down, whole service down</text>
+  <text class="s" x="40" y="712">Dashed lines: Prometheus pulls data (scrapes)</text>
 </svg>

@@ -1,167 +1,169 @@
 # Automated Failure Detection & Alert Notification for Containerized Applications
 
-**DevOps IA-2 case study · Tool: Prometheus and Alertmanager**
+**DevOps IA-2 Case Study · Prometheus & Alertmanager**
 
-| Name | Roll no. |
+| Name | Roll No. |
 |---|---|
 | Yashasvi Gupta | 16010123341 |
 | Shweta Karandikar | 16010123329 |
 | Aditi Agrawal | 16010123018 |
 
-Division faculty: SCP
+**Department of Computer Engineering · Academic Year 2026–27**
 
 ---
 
-A containerized web service (OrderFlow, a small order-taking API backed by
-Redis) runs next to a complete Prometheus + Alertmanager setup. We break the
-service in nine different ways (error spikes, slowness, hangs, memory leaks,
-OOM kills, CPU exhaustion, crashes, a database outage, a full outage) and
-show each failure being detected and turned into an email and a chat message
-within about a minute, with related alerts grouped and side effects
-suppressed. A script measures the detection time of every scenario so the
-tool can be evaluated with numbers rather than impressions.
+### Project Links & Submission Artifacts
+
+- **GitHub Repository:** [https://github.com/Yashvi2874/DevOps_IA2](https://github.com/Yashvi2874/DevOps_IA2)
+- **Demonstration Video & Presentation (Google Drive):** [https://drive.google.com/drive/folders/11pqw2HeYxWI5QLId-3zkHv1x-a_rm6BP?usp=sharing](https://drive.google.com/drive/folders/11pqw2HeYxWI5QLId-3zkHv1x-a_rm6BP?usp=sharing)
+- **Case Study Report (PDF):** [`docs/Case_Study_Report.pdf`](docs/Case_Study_Report.pdf)
+- **Case Study Report (Word):** [`docs/Case_Study_Report.docx`](docs/Case_Study_Report.docx)
+- **Presentation Slides (PDF):** [`docs/DevOps IA2.pdf`](docs/DevOps%20IA2.pdf)
+- **Presentation Slides (PPTX):** [`docs/DevOps IA2.pptx`](docs/DevOps%20IA2.pptx)
+
+---
+
+## Overview
+
+**OrderFlow** is a containerized food ordering service backed by a Redis database. Customers place meal orders day and night, so a silent failure at 2:00 AM that goes unnoticed means customers keep placing orders that never arrive, and the engineering team only discovers the outage the following morning.
+
+Containers make these failures especially easy to miss: Docker can still report a container as `Up` while the application inside has hung, the database crashed, memory leaked until the kernel kills the process, or the CPU hit its quota and throttled everything.
+
+This case study implements automated failure detection and noise-controlled alert notification using **Prometheus** and **Alertmanager** across a ten-container stack. We inject nine real failure scenarios (error spikes, high latency, hangs, memory leaks, OOM kills, CPU exhaustion, container crashes, database outages, and full service outages) and demonstrate:
+- Every failure detected automatically between 16 and 90 seconds (median 60 s).
+- Critical alerts routed to on-call email and chat within ~1 minute.
+- Intelligent noise suppression: Alertmanager inhibits downstream symptoms so a database crash yields exactly one root-cause notification instead of an alert flood.
+- Zero false alarms on a 10-second transient blip due to evaluation wait windows (`for: 30s`).
+- Continuous alerting health verification via an automated `Watchdog` heartbeat.
 
 ![Architecture](docs/screenshots/architecture.png)
 
 ## What runs
 
-`docker compose up -d --build` starts ten containers:
+The complete stack starts with a single command: `docker compose up -d --build`:
 
 | Container | Port | Role |
 |---|---|---|
-| `ia2-shop-api` | 8100 | OrderFlow, the application being monitored (Flask, limited to 256 MB and 0.5 CPU) |
-| `ia2-redis` | – | Its database |
-| `ia2-traffic` | – | Fake users, so error rate and latency mean something |
-| `ia2-prometheus` | 9091 | Scrapes every target every 5 s, evaluates the rules |
-| `ia2-alertmanager` | 9094 | Groups, routes, inhibits and sends notifications |
-| `ia2-blackbox` | 9115 | Probes `/health` and `/ready` from outside, like a user |
-| `ia2-cadvisor` | 8089 | CPU, memory, OOM kills and restarts of every container |
-| `ia2-redis-exporter` | – | Turns Redis stats into Prometheus metrics |
-| `ia2-mailpit` | 8025 | Catches the on-call emails and shows them in a web inbox |
-| `ia2-ops-chat` | 5002 | A Slack-like channel that receives webhook alerts and the heartbeat |
+| `ia2-shop-api` | 8100 | OrderFlow web service (Flask + Gunicorn, limited to 256 MB RAM and 0.5 CPU) |
+| `ia2-redis` | internal | Redis database storing orders |
+| `ia2-traffic` | internal | Simulated customer traffic generating continuous read and order activity |
+| `ia2-prometheus` | 9091 | Scrapes all 7 targets every 5 s, evaluates recording and alerting rules |
+| `ia2-alertmanager` | 9094 | Routes, groups, inhibits, silences, and dispatches alert notifications |
+| `ia2-blackbox` | 9115 | External prober calling `/health` and `/ready` with a 2-second timeout |
+| `ia2-cadvisor` | 8089 | Container Advisor collecting kernel cgroup metrics (CPU, RAM, OOMs, restarts) |
+| `ia2-redis-exporter` | internal | Bridges Redis internal telemetry into Prometheus metrics |
+| `ia2-mailpit` | 8025 | Local SMTP server with responsive web inbox receiving on-call pages |
+| `ia2-ops-chat` | 5002 | Team operations chat channel receiving webhook alerts and watchdog heartbeat |
 
-Open http://localhost:8100 for the app and its fault-injection buttons,
-http://localhost:9091/alerts for Prometheus, http://localhost:9094 for
-Alertmanager, http://localhost:8025 for the email inbox and
-http://localhost:5002 for the chat channel.
+### Service URLs
+- **OrderFlow App & Chaos Panel:** [http://localhost:8100](http://localhost:8100)
+- **Prometheus Dashboard & Alerts:** [http://localhost:9091/alerts](http://localhost:9091/alerts)
+- **Alertmanager Dashboard:** [http://localhost:9094](http://localhost:9094)
+- **Mailpit On-Call Webmail:** [http://localhost:8025](http://localhost:8025)
+- **Ops Chat & Heartbeat:** [http://localhost:5002](http://localhost:5002)
 
-## Three kinds of monitoring
+## Three Angles of Monitoring
 
-1. **White-box.** The app exposes `/metrics`: request counts by route and
-   status, a latency histogram, orders created, dependency status.
-2. **Black-box.** The blackbox exporter calls `/health` and `/ready` like a
-   user would. This catches what white-box metrics miss: a process that is
-   running but hangs.
-3. **Container-level.** cAdvisor reports what Docker gives each container
-   (memory against its limit, CPU against its quota, OOM kills, restarts)
-   for any container, instrumented or not.
+1. **White-box.** OrderFlow exposes `/metrics` via the `prometheus_client` SDK: request counts by route and status, request latency histogram, orders created, and Redis connectivity.
+2. **Black-box.** The Prometheus Blackbox Exporter calls `/health` and `/ready` from outside the container. This catches hangs where the process still runs and `/metrics` answers (`up == 1`), but user requests time out.
+3. **Container-level.** cAdvisor reads Linux cgroup counters directly from the kernel: memory working set vs limit, throttled CPU periods vs total periods, OOM kill events, and container start times.
 
-## Alert rules
+## Alert Rules
 
-| Alert | Condition | Severity | Goes to |
-|---|---|---|---|
-| `ServiceDown` | `up == 0` for 30 s | critical | email + chat |
-| `EndpointDown` | black-box probe of `/health` fails for 40 s | critical | email + chat |
-| `DependencyDown` | `redis_up == 0` for 15 s | critical | email + chat |
-| `HighErrorRate` | more than 10% of requests return 5xx, for 30 s | critical | email + chat |
-| `ContainerOOMKilled` | the kernel killed a process for using too much memory | critical | email + chat |
-| `ServiceNotReady` | `/ready` probe fails for 45 s | warning | chat |
-| `HighLatencyP95` | p95 latency above 500 ms for 1 min | warning | chat |
-| `ContainerMemoryNearLimit` | memory above 80% of the container's limit for 15 s | warning | chat |
-| `ContainerCPUThrottled` | throttled in more than half of CPU periods for 30 s | warning | chat |
-| `ContainerRestarted` | a container started again in the last 5 min | warning | chat |
-| `Watchdog` | always firing (dead man's switch) | none | heartbeat |
+| Alert | Condition | Wait (`for`) | Severity | Delivery Route |
+|---|---|---|---|---|
+| `ServiceDown` | `up == 0` | 30 s | critical | email + chat |
+| `EndpointDown` | black-box probe of `/health` fails | 40 s | critical | email + chat |
+| `DependencyDown` | `redis_up == 0 or up{job="redis"} == 0` | 15 s | critical | email + chat |
+| `HighErrorRate` | HTTP 5xx error ratio > 10% | 30 s | critical | email + chat |
+| `ContainerOOMKilled` | `increase(container_oom_events_total[5m]) > 0` | 0 s | critical | email + chat |
+| `ServiceNotReady` | `/ready` probe fails | 45 s | warning | chat only |
+| `HighLatencyP95` | p95 latency > 500 ms | 1 m | warning | chat only |
+| `ContainerMemoryNearLimit` | memory > 80% of limit | 15 s | warning | chat only |
+| `ContainerCPUThrottled` | throttled in > 50% of CPU periods | 30 s | warning | chat only |
+| `ContainerRestarted` | container start timestamp changed in last 5m | 0 s | warning | chat only |
+| `Watchdog` | always firing `vector(1)` (dead man's snitch) | 0 s | none | heartbeat receiver |
 
-Six **recording rules** pre-compute request rate, error ratio, p95 latency, CPU throttling
-and memory and CPU use relative to the container limits.
+Precomputed **recording rules** calculate request rates, error ratios, 95th percentile latency, CPU throttling ratios, and memory percentages relative to limits.
 
-## What Alertmanager adds
+## Alertmanager Pipeline & Noise Control
 
-- **Routing:** critical alerts are emailed to on-call *and* posted to the
-  chat (`continue: true`); warnings go to the chat only.
-- **Grouping:** alerts are bundled by `alertname` and `service`, with a short
-  wait so related alerts arrive in one message.
-- **Inhibition:** when the cause is known, its symptoms are held back.
-  `DependencyDown` hides the error spike and "not ready" it causes;
-  `ServiceDown` hides the failed probes; `EndpointDown` hides the latency it
-  causes.
-- **Heartbeat:** the `Watchdog` alert always fires and reaches the chat page
-  about once a minute. If it stops, the alerting pipeline itself is broken,
-  and the page says so.
-- **Templates:** `monitoring/alertmanager/templates/email.tmpl` builds the
-  subject line (`[FIRING x1] HighErrorRate on shop-api`) and an HTML email
-  with summary, details and what to do.
+- **Routing:** Critical alerts email on-call immediately (`group_wait: 5s`) *and* dispatch to ops chat (`continue: true`). Warnings route to ops chat only.
+- **Grouping:** Alerts are bundled by `[alertname, service]` so related occurrences arrive as a single notification.
+- **Inhibition:** When a root cause is firing, secondary symptoms are held back:
+  - `DependencyDown` (Redis down) inhibits `HighErrorRate`, `HighLatencyP95`, and `ServiceNotReady`.
+  - `ServiceDown` inhibits `EndpointDown` and derivative warnings.
+  - `EndpointDown` inhibits latency and readiness alerts.
+- **Heartbeat:** The `Watchdog` alert continuously pings the ops chat receiver (~every minute). If the alerting pipeline breaks, the heartbeat badge turns red.
+- **HTML Templates:** Custom email templates format clear incident subjects (`[FIRING x1] HighErrorRate on shop-api`) with runbook links and remediation guidance.
 
-## Breaking things on purpose
+## Failure Scenarios & Benchmark Results
 
-Use the buttons on http://localhost:8100, or the script:
+Faults can be triggered via the web UI at http://localhost:8100 or using the automated chaos scripts:
 
 ```powershell
-.\scripts\chaos.ps1 errors     # also: slow, hang, leak, oom, cpu, crash, db-down, app-down, reset
+.\scripts\chaos.ps1 errors     # Options: slow, hang, leak, oom, cpu, crash, db-down, app-down, reset
 ```
 
-Measured on our machine with `python scripts/measure_detection.py`
-(time from injecting the fault to the notification arriving):
+Detection and recovery latency benchmarked via `python scripts/measure_detection.py`:
 
-| Failure injected | Alert | Severity | Ops chat | On-call email | Resolved after fix |
+| Failure Injected | Triggered Alert | Severity | Ops Chat | On-Call Email | Resolved After Fix |
 |---|---|---|---|---|---|
-| API error spike (50% of requests fail) | `HighErrorRate` | critical | 64 s | 59 s | 57 s |
-| Slow responses (1.5 s per request) | `HighLatencyP95` | warning | 90 s | – | 56 s |
-| App hangs (3 s, health probe times out) | `EndpointDown` | critical | 60 s | 55 s | 26 s |
-| Memory leak up to ~85% of the limit | `ContainerMemoryNearLimit` | warning | 72 s | – | 26 s |
-| CPU burn (container at its CPU limit) | `ContainerCPUThrottled` | warning | 76 s | – | 56 s |
-| Database outage (docker stop ia2-redis) | `DependencyDown` | critical | 32 s | 27 s | 26 s |
-| Out of memory (fast leak, kernel OOM kill) | `ContainerOOMKilled` | critical | 31 s | 26 s | 296 s ¹ |
-| Container crash (process exits) | `ContainerRestarted` | warning | 16 s | – | – ² |
-| Whole service down (docker stop ia2-shop-api) | `ServiceDown` | critical | 52 s | 47 s | 27 s |
+| API error spike (50% requests fail) | `HighErrorRate` | critical | 64 s | 59 s | 57 s |
+| Slow responses (+1.5 s latency) | `HighLatencyP95` | warning | 90 s | n/a | 56 s |
+| Web service hang (+3.0 s delay) | `EndpointDown` | critical | 60 s | 55 s | 26 s |
+| Memory leak (~85% of RAM limit) | `ContainerMemoryNearLimit` | warning | 72 s | n/a | 26 s |
+| CPU burn (saturated quota) | `ContainerCPUThrottled` | warning | 76 s | n/a | 56 s |
+| Database outage (`docker stop ia2-redis`) | `DependencyDown` | critical | 32 s | 27 s | 26 s |
+| Fast memory leak (kernel OOM kill) | `ContainerOOMKilled` | critical | 31 s | 26 s | 296 s ¹ |
+| Container crash (process exits) | `ContainerRestarted` | warning | 16 s | n/a | n/a ² |
+| Full service outage (`docker stop ia2-shop-api`) | `ServiceDown` | critical | 52 s | 47 s | 27 s |
 
-¹ `ContainerOOMKilled` looks at OOM events over the last 5 minutes, so it stays visible for 5 minutes after the kill by design.  
-² A restart is a one-off event; the alert clears by itself 5 minutes later.
+¹ `ContainerOOMKilled` evaluates events over a 5-minute sliding window; it naturally clears 5 minutes after the kill.  
+² Container restarts are discrete point-in-time events; the warning clears automatically after 5 minutes.
 
-A 10-second outage sent **no** critical page (the `for: 30s` rule at work).
+- **Transient Blip Resilience:** Stopping OrderFlow for 10 seconds dispatched **zero** critical pages because the 30-second `for` wait window absorbed the temporary blip.
+- Raw measurement logs are preserved in [`docs/results/`](docs/results).
 
-The full output is in [`docs/results`](docs/results).
+## Automated Testing & CI/CD Pipeline
 
-## Tests and CI
+Our GitHub Actions workflow (`.github/workflows/ci.yml`) treats alerting as code and validates every commit across three stages:
+1. **Unit Tests:** Runs 20 `pytest` tests on OrderFlow, 6 tests on the chat receiver, and `flake8` linting.
+2. **Prometheus & Alertmanager Validation:** Validates rule syntax with `promtool check rules`, verifies alert math with `promtool test rules` (8 test suites, including transient blip suppression), and tests routing trees with `amtool config routes test`.
+3. **End-to-End Smoke Test:** Starts all 10 containers via Docker Compose, waits for target health and the Watchdog heartbeat, injects a 50% error rate, and asserts alert delivery in both Mailpit and Ops Chat.
 
-- `app/tests`: 20 pytest tests for the service and the fault injection.
-- `monitoring/prometheus/tests/alert_rules_test.yml`: promtool unit tests for
-  the rules, including one proving that a 10-second blip does **not** alert.
-- `monitoring/ops-chat/test_receiver.py`: tests for the chat receiver.
-- GitHub Actions runs all of the above, checks the Alertmanager routing with
-  `amtool`, then starts the whole stack, injects errors and waits for the
-  alert to arrive in both the chat and the email inbox.
+![CI/CD Pipeline](docs/screenshots/github-actions.png)
 
-## Repository layout
+## Repository Layout
 
 ```
-app/                     OrderFlow service, tests, Dockerfile
-traffic/                 traffic generator
-monitoring/prometheus/   prometheus.yml, rules/, tests/
-monitoring/alertmanager/ alertmanager.yml, templates/
-monitoring/blackbox/     probe settings
-monitoring/ops-chat/     webhook receiver (chat + heartbeat)
-scripts/                 chaos.ps1 / chaos.sh, measure_detection.py
-docs/                    case study report (md, docx, pdf), presentation (pptx), screenshots, results
+.github/workflows/       GitHub Actions automated CI/CD pipeline
+app/                     OrderFlow Flask application, Dockerfile, and pytest suite
+monitoring/
+  prometheus/            Scrape config, recording rules, alert rules, promtool tests
+  alertmanager/          Routing tree, inhibition rules, HTML email templates
+  blackbox/              HTTP 2xx synthetic probe configuration
+  ops-chat/              Chat webhook receiver with live watchdog heartbeat badge
+traffic/                 Simulated customer ordering traffic generator
+scripts/                 Chaos fault injection (chaos.ps1, chaos.sh) and detection benchmark
+docs/                    Case study report (PDF, DOCX, MD), presentation slides, screenshots
 ```
 
-## Useful PromQL to try in Prometheus
+## Useful PromQL Queries
 
 ```promql
-service:http_requests:rate1m                     # requests per second
-service:http_errors:ratio_rate1m                 # share of failed requests
-service:http_request_duration_seconds:p95_1m     # p95 latency
-container:memory_working_set:ratio_limit         # memory vs limit, per container
-probe_success                                    # black-box probe results
-ALERTS{alertstate="firing"}                      # what is firing right now
+service:http_requests:rate1m                     # Requests per second
+service:http_errors:ratio_rate1m                 # Error ratio (0% to 100%)
+service:http_request_duration_seconds:p95_1m     # 95th percentile latency
+container:memory_working_set:ratio_limit         # Memory utilization relative to limit
+container_cpu_cfs_throttled_periods_total        # CPU throttling events from kernel
+probe_success                                    # External blackbox probe availability (0 or 1)
+ALERTS{alertstate="firing"}                      # Active firing alerts in Prometheus
 ```
 
 ## Troubleshooting
 
-- **Port already in use:** change the left side of the port in `docker-compose.yml`.
-- **No alert yet:** check http://localhost:9091/alerts. *Pending* means the
-  `for` timer is still running.
-- **Edited a rule?** `curl -X POST localhost:9091/-/reload` reloads Prometheus
-  without a restart (`localhost:9094/-/reload` for Alertmanager).
-- **cAdvisor shows nothing:** it needs `privileged` and the host mounts in
-  `docker-compose.yml`; on Docker Desktop it works as configured.
+- **Port Conflict:** If port 8100, 9091, 9094, 8025, or 5002 is in use, modify the host port binding in `docker-compose.yml`.
+- **Alert Status:** Inspect `http://localhost:9091/alerts`. Alerts show as *Pending* while the `for` duration timer evaluates.
+- **Hot Reloading:** Config changes can be reloaded without container restarts via `curl -X POST localhost:9091/-/reload` (Prometheus) and `curl -X POST localhost:9094/-/reload` (Alertmanager).
+- **cAdvisor Permissions:** Requires privileged mode and host root filesystem mounts in `docker-compose.yml` to query cgroup metrics.
